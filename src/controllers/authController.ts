@@ -2,8 +2,10 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma';
+import { User } from '@prisma/client';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const TOKEN_EXPIRY = '24h';
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -28,6 +30,7 @@ export const register = async (req: Request, res: Response) => {
         email,
         password: hashedPassword,
         name,
+        role: 'USER'
       },
     });
     
@@ -35,7 +38,7 @@ export const register = async (req: Request, res: Response) => {
     const token = jwt.sign(
       { userId: user.id },
       JWT_SECRET,
-      { expiresIn: '1d' }
+      { expiresIn: TOKEN_EXPIRY }
     );
     
     res.status(201).json({
@@ -49,6 +52,7 @@ export const register = async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
+    console.error('Registration error:', error);
     res.status(500).json({ error: 'Registration failed' });
   }
 };
@@ -77,7 +81,7 @@ export const login = async (req: Request, res: Response) => {
     const token = jwt.sign(
       { userId: user.id },
       JWT_SECRET,
-      { expiresIn: '1d' }
+      { expiresIn: TOKEN_EXPIRY }
     );
     
     res.json({
@@ -91,20 +95,21 @@ export const login = async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
   }
 };
 
 export const getProfile = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const user = req.user as User;
     
-    if (!userId) {
+    if (!user) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
     
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const userData = await prisma.user.findUnique({
+      where: { id: user.id },
       select: {
         id: true,
         email: true,
@@ -115,12 +120,13 @@ export const getProfile = async (req: Request, res: Response) => {
       }
     });
     
-    if (!user) {
+    if (!userData) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    res.json(user);
+    res.json(userData);
   } catch (error) {
+    console.error('Profile fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch profile' });
   }
 }; 
