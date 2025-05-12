@@ -1,9 +1,9 @@
 import express, { Request, Response } from 'express';
-import productRoutes from './routes/productRoutes';
+import { RabbitMQService } from './services/rabbitmq.service';
 import authRoutes from './routes/authRoutes';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(express.json());
@@ -11,12 +11,11 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.get('/', (req: Request, res: Response) => {
-    res.send('Hello, Express.js with TypeScript!');
+    res.send('Auth Service is running');
 });
 
 // API routes
 app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: any) => {
@@ -24,7 +23,20 @@ app.use((err: any, req: Request, res: Response, next: any) => {
     res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-});
+const rabbitMQ = RabbitMQService.getInstance();
+
+async function startServer() {
+    try {
+        await rabbitMQ.connect();
+        await rabbitMQ.consumeProductEvents();
+        
+        app.listen(PORT, () => {
+            console.log(`Auth Service is running on http://localhost:${PORT}`);
+        });
+    } catch (error) {
+        console.error('Failed to start Auth Service:', error);
+        process.exit(1);
+    }
+}
+
+startServer();
